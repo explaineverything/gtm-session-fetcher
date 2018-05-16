@@ -95,6 +95,8 @@ GTM_ASSUME_NONNULL_END
 
 @property(atomic, readwrite, getter=isUsingBackgroundSession) BOOL usingBackgroundSession;
 
+@property (atomic, strong) NSFileHandle *mc_fileHandle;
+
 @end
 
 #if !GTMSESSION_BUILD_COMBINED_SOURCES
@@ -2529,8 +2531,45 @@ totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
         _downloadedData = [[NSMutableData alloc] init];
       }
 
-      [_downloadedData appendData:data];
-      _downloadedLength = (int64_t)_downloadedData.length;
+        if (self.mc_destinationFileURL) {
+
+            if (!self.mc_fileHandle) {
+
+                NSFileManager *fileManager = [NSFileManager defaultManager];
+                if ([fileManager fileExistsAtPath:self.mc_destinationFileURL.path]) {
+
+                    NSError *error = nil;
+                    BOOL success = [fileManager removeItemAtURL:self.mc_destinationFileURL error:&error];
+
+                    if (!success) {
+                        [dataTask cancel];
+                        return;
+                    }
+                }
+
+                BOOL success = [fileManager createFileAtPath:self.mc_destinationFileURL.path contents:nil attributes:nil];
+
+                if (!success) {
+                    [dataTask cancel];
+                    return;
+                }
+
+                self.mc_fileHandle = [NSFileHandle fileHandleForWritingAtPath:self.mc_destinationFileURL.path];
+
+                if (!self.mc_fileHandle) {
+                    [dataTask cancel];
+                    return;
+                }
+            }
+
+            [self.mc_fileHandle writeData:data];
+
+            _downloadedLength += (int64_t)data.length;
+        }
+        else {
+            [_downloadedData appendData:data];
+            _downloadedLength = (int64_t)_downloadedData.length;
+    }
 
       // We won't hold on to receivedProgressBlock here; it's ok to not send
       // it if the transfer finishes.
@@ -2691,6 +2730,12 @@ didFinishDownloadingToURL:(NSURL *)downloadLocationURL {
 - (void)URLSession:(NSURLSession *)session
               task:(NSURLSessionTask *)task
 didCompleteWithError:(NSError *)error {
+
+    if (self.mc_fileHandle) {
+        [self.mc_fileHandle closeFile];
+        self.mc_fileHandle = nil;
+    }
+
   [self setSessionTask:task];
   GTM_LOG_SESSION_DELEGATE(@"%@ %p URLSession:%@ task:%@ didCompleteWithError:%@",
                            [self class], self, session, task, error);

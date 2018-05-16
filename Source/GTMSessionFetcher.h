@@ -1074,6 +1074,8 @@ NSData * GTM_NULLABLE_TYPE GTMDataFromInputStream(NSInputStream *inputStream, NS
 // Will create the enclosing folders if they are not present.
 @property(atomic, strong, GTM_NULLABLE) NSURL *destinationFileURL;
 
+@property(atomic, strong, GTM_NULLABLE) NSURL *mc_destinationFileURL;
+
 // The time this fetcher originally began fetching. This is useful as a time
 // barrier for ignoring irrelevant fetch notifications or callbacks.
 @property(atomic, strong, readonly, GTM_NULLABLE) NSDate *initialBeginFetchDate;
